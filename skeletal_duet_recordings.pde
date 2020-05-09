@@ -1,3 +1,5 @@
+//int ANIMATION_COLOR = #64fff0;
+int[] ANIMATION_COLOR = {#ffffff,#64fff0,#6400f0,#00fff0,#64f00f};
 import SimpleOpenNI.*;
 
 //Generate a SimpleOpenNI object
@@ -20,6 +22,45 @@ float LeftLegAngle = 0;
 //Timer variables
 float a = 0;
 
+class AnimationFrame{
+  PVector[] joints = new PVector[16];
+  PVector[] joint = new PVector[1];
+  AnimationFrame(){
+  }
+  void addJoint(PVector jointData, int jointId){
+    joints[jointId] = jointData;
+  }
+}
+
+class AnimationRecording{
+  ArrayList<AnimationFrame> frames = new ArrayList<AnimationFrame>() ;
+  int currentFrame = -1;
+  int currentPlayFrame = -1;
+  
+
+  AnimationRecording(){
+    frames.add(new AnimationFrame());
+  }
+  
+  void nextFrame(){
+    if(!frames.isEmpty()){
+    currentFrame++;
+    frames.add(new AnimationFrame());}
+  }
+  
+  void nextPlayFrame(){
+    currentPlayFrame++;
+    if(currentPlayFrame >= frames.size()){
+      currentPlayFrame = 0;
+    }
+  }
+  
+  void saveJoint(PVector joint, int jointId){
+    println("save joint, current frame : " + currentFrame);
+    
+    frames.get(currentFrame).addJoint(joint, jointId);
+  }
+}
 //save
 JSONObject json;
 int windowWidth = 640;
@@ -28,15 +69,18 @@ int startTime = millis();
 int framesLength = 500;
 int dancers = 5;
 int currentDancer = 0;
-PVector[][][] animationRecording = new PVector[dancers][framesLength][17];
+
+AnimationRecording[] animationRecordings = new AnimationRecording[dancers];
 int currentFrame = 0;
 int currentPlayFrame = 0;
 boolean record = false;
-
+boolean playAnimation = false;
 
 
 void setup() {
-        size(640, 480);
+        size(1280, 960);
+          frameRate(30);
+
         kinect = new SimpleOpenNI(this);
         kinect.enableDepth();
         //kinect.enableIR();
@@ -52,13 +96,47 @@ void setup() {
 void draw() {
         
         kinect.update();
+        
+        scale(2);
+
+        drawKinectImage();
+        
+        skeletalDetection();
+
+        drawDancers();
+        
+        //drawLinesOnScreen();
+      
+        drawRecordIndicator();
+
+      //fill(50,50,200);
+}
+
+void drawKinectImage(){
         //image(kinect.depthImage(), 0, 0);
         //image(kinect.irImage(),kinect.depthWidth(),0);
         //image(kinect.userImage(),0,0);
-        image(kinect.rgbImage(), 0, 0);
-IntVector userList = new IntVector();
-        kinect.getUsers(userList);
-        if (userList.size() > 0) {
+        image(kinect.rgbImage(), 0, 0); 
+}
+void drawRecordIndicator(){
+      if(record) {
+        //red recxord dot
+        fill(250,0,0);
+        stroke(0,0);
+        ellipse(20 ,20,25,25);
+      }  
+}
+void drawLinesOnScreen(){
+      line(windowWidth/2 - 20, windowHeight/5 - 20, windowWidth/2 + 20, windowHeight/5 + 20);
+      line(windowWidth/2 - 20, windowHeight/5 + 20, windowWidth/2 + 20, windowHeight/5 - 20);
+      stroke(20,255,100);
+      strokeWeight(6);
+         
+}
+void skeletalDetection(){
+      IntVector userList = new IntVector();
+      kinect.getUsers(userList);
+      if (userList.size() > 0) {
                 int userId = userList.get(0);
                 //If we detect one user we have to draw it
                 if( kinect.isTrackingSkeleton(userId)) {
@@ -73,51 +151,34 @@ IntVector userList = new IntVector();
 
                 }
         }
-
-        
-        //println(startTime);
-        //println(millis());
-        if(!record){
-          drawDancers();
-        }
-        // lines
-        //line(windowWidth/2 - 20, windowHeight/5 - 20, windowWidth/2 + 20, windowHeight/5 + 20);
-        //line(windowWidth/2 - 20, windowHeight/5 + 20, windowWidth/2 + 20, windowHeight/5 - 20);
-        //stroke(20,255,100);
-        //strokeWeight(6);
-        
-      
-      if(record) {
-        fill(250,0,0);
-        stroke(0,0);
-        ellipse(12,12,15,15);
-        
 }
-
-      
-      //fill(50,50,200);
-}
+// animationRecordings[dancer].frames.get(animationRecordings[currentDancer].currentFrame).joints.get(SimpleOpenNI.SKEL_LEFT_SHOULDER).x
 void drawDancers(){
-           
-          for(int dancerIndex = 0; dancerIndex < dancers; dancerIndex++){
-            if(animationRecording[dancerIndex][currentPlayFrame][0] == null) continue;
-            for(int i =1; i < 15; i++){
-              println(currentPlayFrame);
-              if(animationRecording[dancerIndex][currentPlayFrame][i-1] != null){
-                ellipse(animationRecording[dancerIndex][currentPlayFrame][i-1].x, animationRecording[dancerIndex][currentPlayFrame][i-1].y, 5,5);
-                if(currentPlayFrame >1 && currentPlayFrame < framesLength){
-                 playLimbs(dancerIndex);
-              }
-              }
-            }
-          }
-            if (currentPlayFrame < framesLength-1) {currentPlayFrame++;}
-          else {currentPlayFrame = 0; } 
+     if(currentDancer > 0 ){
+        for(int dancerIndex = 0; dancerIndex < currentDancer; dancerIndex++){
+          // forward frame before drawing the joints
+          
+          if(animationRecordings[dancerIndex] == null || animationRecordings[dancerIndex].frames.size() == 0) continue;
+          println("drawing: " + animationRecordings[dancerIndex]);
+          animationRecordings[dancerIndex].nextPlayFrame();
+          
+          stroke(ANIMATION_COLOR[dancerIndex]);
+          drawLimbs(dancerIndex);
+          //for(int i =1; i < 16; i++){
+          //  if(animationRecordings[dancerIndex].frames.get(animationRecordings[dancerIndex].currentPlayFrame).joints.length> 1){
+          //    ellipse(
+          //      animationRecordings[dancerIndex].frames.get(animationRecordings[dancerIndex].currentPlayFrame).joints[i-1].x, 
+          //      animationRecordings[dancerIndex].frames.get(animationRecordings[dancerIndex].currentPlayFrame).joints[i-1].y, 5,5);
+          //  }
+          //}
+          
+        }
+    }
 }
 //Draw the skeleton
 void drawSkeleton(int userId) {
         stroke(200,0,200);
-        strokeWeight(3);
+        strokeWeight(2);
         float[] orientation3d = new float[16];
         PVector joint = new PVector();
         PMatrix3D joint2 = new PMatrix3D();
@@ -149,6 +210,9 @@ void drawSkeleton(int userId) {
         noStroke();
         fill(20,255,100);
        
+        // new animation frame
+        if(record) animationRecordings[currentDancer].nextFrame();
+        
         drawJoint(userId, SimpleOpenNI.SKEL_HEAD, record);
         drawJoint(userId, SimpleOpenNI.SKEL_NECK, record);
         drawJoint(userId, SimpleOpenNI.SKEL_LEFT_SHOULDER, record);
@@ -171,103 +235,179 @@ void drawSkeleton(int userId) {
         if (record) {currentFrame++;}
            
 }
-void playLimbs(int dancer){
+void drawLimbs(int dancer){
   try{
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_HEAD].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_HEAD].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_NECK].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_NECK].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_HEAD].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_HEAD].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_NECK].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_NECK].y
        );
+  }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_NECK].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_NECK].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_SHOULDER].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_SHOULDER].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_NECK].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_NECK].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_SHOULDER].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_SHOULDER].y
        );
+       
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_SHOULDER].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_SHOULDER].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_ELBOW].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_ELBOW].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_SHOULDER].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_SHOULDER].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_ELBOW].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_ELBOW].y
        );
+       
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_ELBOW].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_ELBOW].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HAND].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HAND].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_ELBOW].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_ELBOW].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HAND].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HAND].y
        );
+       
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_NECK].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_NECK].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_SHOULDER].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_SHOULDER].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_NECK].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_NECK].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_SHOULDER].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_SHOULDER].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_SHOULDER].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_SHOULDER].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_ELBOW].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_ELBOW].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_SHOULDER].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_SHOULDER].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_ELBOW].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_ELBOW].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_ELBOW].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_ELBOW].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HAND].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HAND].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_ELBOW].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_ELBOW].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HAND].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HAND].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_SHOULDER].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_SHOULDER].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_SHOULDER].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_SHOULDER].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_SHOULDER].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_SHOULDER].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_SHOULDER].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_SHOULDER].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HIP].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HIP].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HIP].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HIP].y
+       );  }catch(Exception e){
+    println(e);
+  };
+    try{
+
+      
+       line(
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HIP].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HIP].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_KNEE].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_KNEE].y
+       );  }catch(Exception e){
+    println(e);
+  };
+    try{
+
+       line(
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_KNEE].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_KNEE].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_FOOT].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_FOOT].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HIP].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HIP].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_KNEE].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_KNEE].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_TORSO].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HIP].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HIP].y
+       );  }catch(Exception e){
+    println(e);
+  };
+    try{
+
+       line(
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HIP].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HIP].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_KNEE].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_KNEE].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_KNEE].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_KNEE].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_FOOT].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_FOOT].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_KNEE].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_KNEE].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_FOOT].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_FOOT].y
        );
+         }catch(Exception e){
+    println(e);
+  };
+    try{
+
        line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_TORSO].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HIP].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HIP].y
-       );
-       line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HIP].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HIP].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_KNEE].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_KNEE].y
-       );
-       line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_KNEE].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_KNEE].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_FOOT].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_FOOT].y
-       );
-       line(
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HIP].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_RIGHT_HIP].y,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HIP].x,
-          animationRecording[dancer][currentPlayFrame][SimpleOpenNI.SKEL_LEFT_HIP].y
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HIP].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_RIGHT_HIP].y,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HIP].x,
+          animationRecordings[dancer].frames.get(animationRecordings[dancer].currentPlayFrame).joints[SimpleOpenNI.SKEL_LEFT_HIP].y
        );
   }catch(Exception e){
     println(e);
@@ -286,13 +426,9 @@ void drawJoint(int userId, int jointID, boolean record) {
         PVector convertedJoint = new PVector();
         kinect.convertRealWorldToProjective(joint, convertedJoint);
         // recording
-        if(record && currentDancer < dancers){
-          if(currentFrame >= framesLength){
-            currentFrame = 0;
-            record = false;
-          }else{
-         animationRecording[currentDancer][currentFrame][jointID] = convertedJoint;
-          }
+        if(record){
+          println("saving joint: " + jointID);
+           animationRecordings[currentDancer].saveJoint(convertedJoint, jointID);
         }
         
         ellipse(convertedJoint.x, convertedJoint.y, 5, 5);
@@ -317,16 +453,16 @@ void onLostUser(SimpleOpenNI curContext, int userId) {
 void MassUser(int userId) {
         if(kinect.getCoM(userId,com)) {
                 kinect.convertRealWorldToProjective(com,com2d);
-                stroke(100,255,240);
-                strokeWeight(3);
+                stroke(100,100,0);
+                strokeWeight(2);
                 beginShape(LINES);
-                vertex(com2d.x,com2d.y - 5);
-                vertex(com2d.x,com2d.y + 5);
-                vertex(com2d.x - 5,com2d.y);
-                vertex(com2d.x + 5,com2d.y);
+                vertex(com2d.x,com2d.y - 2);
+                vertex(com2d.x,com2d.y + 2);
+                vertex(com2d.x - 2,com2d.y);
+                vertex(com2d.x + 2,com2d.y);
                 endShape();
                 fill(0,255,100);
-                text(Integer.toString(userId),com2d.x,com2d.y);
+                text("body " + Integer.toString(userId),com2d.x + 2,com2d.y - 4);
         }
 }
 
@@ -428,10 +564,22 @@ void recordMovement() {
 void playMovement(){
 }
 void mouseClicked(){
-  record = !record;
+  //record = !record;
   //fill(100,100,0);
-  if (!record){
-   currentDancer++;   
+  
+  if (!record)
+  {
+    if (currentDancer < dancers){
+     animationRecordings[currentDancer] = new AnimationRecording();
+  
+     record = true;
+    }
+  } 
+  else 
+  { 
+    record = false;
+    currentDancer++;  
+
   }
 }
 void keyPressed() {
