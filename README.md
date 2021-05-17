@@ -4,7 +4,7 @@ Uses SimpleOpenni to detect and capture 3D movement and loop it on screen.
 
 ![sceenshot](screenshot.png) 
 
-![openni](Screen Shot 2017-10-17 at 21.19.06.png)
+![openni](Screen%20Shot%202017-10-17%20at%2021.19.06.png)
 
 # Skeleton tracking and angle detection using SimpleOpenni library
 
